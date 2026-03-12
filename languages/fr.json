@@ -1,0 +1,33 @@
+{
+  "CRITICAL_RUBAN": {
+    "settings": {
+      "enableBanner": {
+        "name": "Afficher les rubans",
+        "hint": "Affiche un ruban lors des réussites et échecs critiques."
+      },
+      "enableSound": {
+        "name": "Jouer les sons",
+        "hint": "Joue un son lors de l'affichage d'un ruban."
+      },
+      "soundVolume": {
+        "name": "Volume des sons",
+        "hint": "Volume des sons du module."
+      },
+      "criticalSoundPath": {
+        "name": "Son personnalisé - réussite critique",
+        "hint": "Laisser vide pour utiliser le son par défaut. Seul le MJ peut choisir un fichier audio personnalisé."
+      },
+      "fumbleSoundPath": {
+        "name": "Son personnalisé - échec critique",
+        "hint": "Laisser vide pour utiliser le son par défaut. Seul le MJ peut choisir un fichier audio personnalisé."
+      },
+      "resetDefaultSound": "Réinitialiser son par défaut"
+    },
+    "ruban": {
+      "label": {
+        "criticalSuccess": "Réussite critique",
+        "criticalFailure": "Échec critique"
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "CRITICAL_RUBAN": {
+    "settings": {
+      "enableBanner": {
+        "name": "Display banners",
+        "hint": "Displays a banner when a critical success or failure occurs."
+      },
+      "enableSound": {
+        "name": "Play sounds",
+        "hint": "Play a sound when a banner appears."
+      },
+      "soundVolume": {
+        "name": "Sound volume",
+        "hint": "Volume of the module sounds."
+      },
+      "criticalSoundPath": {
+        "name": "Custom sound - critical success",
+        "hint": "Leave empty to use the default sound. Only the GM can choose a custom audio file."
+      },
+      "fumbleSoundPath": {
+        "name": "Custom sound - critical failure",
+        "hint": "Leave empty to use the default sound. Only the GM can choose a custom audio file."
+      },
+      "resetDefaultSound": "Reset to default sound"
+    },
+    "ruban": {
+      "label": {
+        "criticalSuccess": "Critical success",
+        "criticalFailure": "Critical failure"
+      }
+    }
+  }
+}
