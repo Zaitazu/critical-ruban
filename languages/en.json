@@ -3,30 +3,44 @@
     "settings": {
       "enableBanner": {
         "name": "Display banners",
-        "hint": "Displays a banner when a critical success or failure occurs."
+        "hint": "Shows a banner when a critical success or critical failure occurs."
       },
       "enableSound": {
         "name": "Play sounds",
-        "hint": "Play a sound when a banner appears."
+        "hint": "Plays a sound when a banner is displayed."
       },
       "soundVolume": {
         "name": "Sound volume",
-        "hint": "Volume of the module sounds."
+        "hint": "Volume level of the module sounds."
       },
       "criticalSoundPath": {
-        "name": "Custom sound - critical success",
+        "name": "Custom sound – critical success",
         "hint": "Leave empty to use the default sound. Only the GM can choose a custom audio file."
       },
       "fumbleSoundPath": {
-        "name": "Custom sound - critical failure",
+        "name": "Custom sound – critical failure",
         "hint": "Leave empty to use the default sound. Only the GM can choose a custom audio file."
       },
-      "resetDefaultSound": "Reset to default sound"
+
+      "criticalExitEffect": {
+        "name": "Exit effect – critical success",
+        "hint": "Choose the animation used when the critical success banner disappears."
+      },
+      "fumbleExitEffect": {
+        "name": "Exit effect – critical failure",
+        "hint": "Choose the animation used when the critical failure banner disappears."
+      },
+
+      "exitEffectChoices": {
+        "current": "Default animation",
+        "iceShatter": "Freeze and shatter"
+      }
     },
+
     "ruban": {
       "label": {
-        "criticalSuccess": "Critical success",
-        "criticalFailure": "Critical failure"
+        "criticalSuccess": "Critical Success",
+        "criticalFailure": "Critical Failure"
       }
     }
   }

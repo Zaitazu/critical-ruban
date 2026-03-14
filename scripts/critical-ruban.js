@@ -1,10 +1,59 @@
 const MODULE_ID = "critical-ruban";
 
+const BANNER_SLOTS = [
+  { top: "50%", left: "50%", transform: "translate(-50%, -50%) scale(1) rotate(0deg)" },
+
+  { top: "33%", left: "42%", transform: "translate(-50%, -50%) scale(0.95) rotate(-7deg)" },
+  { top: "67%", left: "58%", transform: "translate(-50%, -50%) scale(0.95) rotate(7deg)" },
+
+  { top: "24%", left: "61%", transform: "translate(-50%, -50%) scale(0.95) rotate(9deg)" },
+  { top: "76%", left: "39%", transform: "translate(-50%, -50%) scale(0.95) rotate(-9deg)" },
+
+  { top: "50%", left: "67%", transform: "translate(-50%, -50%) scale(0.88) rotate(11deg)" }
+];
+
+const EXIT_EFFECTS = {
+  CURRENT: "current",
+  ICE_SHATTER: "iceShatter"
+};
+
+const EXIT_TIMINGS = {
+  current: {
+    startDelay: 3000,
+    totalDuration: 1300
+  },
+  iceShatter: {
+    startDelay: 3000,
+    freezeDuration: 460,
+    crackDuration: 220,
+    shatterDuration: 820,
+    totalDuration: 1650
+  }
+};
+
+const ICE_SHARD_POLYGONS = [
+  "polygon(50% 0%, 100% 20%, 82% 100%, 18% 88%, 0% 28%)",
+  "polygon(20% 0%, 100% 14%, 88% 76%, 44% 100%, 0% 54%)",
+  "polygon(0% 16%, 62% 0%, 100% 42%, 82% 100%, 24% 86%)",
+  "polygon(34% 0%, 100% 26%, 70% 100%, 0% 74%, 10% 18%)",
+  "polygon(8% 0%, 74% 0%, 100% 58%, 58% 100%, 0% 72%)",
+  "polygon(24% 0%, 100% 10%, 86% 58%, 54% 100%, 0% 80%, 8% 24%)",
+  "polygon(0% 30%, 42% 0%, 100% 18%, 92% 84%, 28% 100%, 8% 62%)",
+  "polygon(14% 0%, 82% 8%, 100% 54%, 72% 100%, 0% 88%, 4% 30%)"
+];
+
 Hooks.once("ready", () => {
   registerSettings();
 
   globalThis.__critBannerShown ??= new Set();
   globalThis.__critBannerPending ??= new Map();
+  globalThis.__critBannerSlots ??= new Map();
+
+  globalThis.CriticalRuban = {
+    show: showBannerManually,
+    showCritical: (name, color) => showBannerManually({ type: "critical", name, color }),
+    showFumble: (name, color) => showBannerManually({ type: "fumble", name, color })
+  };
 
   Hooks.on("renderChatMessageHTML", onRenderChatMessageHTML);
 
@@ -67,6 +116,31 @@ function registerSettings() {
     default: "",
     filePicker: "audio"
   });
+
+  game.settings.register(MODULE_ID, "criticalExitEffect", {
+    name: game.i18n.localize("CRITICAL_RUBAN.settings.criticalExitEffect.name"),
+    hint: game.i18n.localize("CRITICAL_RUBAN.settings.criticalExitEffect.hint"),
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      [EXIT_EFFECTS.CURRENT]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.current")
+    },
+    default: EXIT_EFFECTS.CURRENT
+  });
+
+  game.settings.register(MODULE_ID, "fumbleExitEffect", {
+    name: game.i18n.localize("CRITICAL_RUBAN.settings.fumbleExitEffect.name"),
+    hint: game.i18n.localize("CRITICAL_RUBAN.settings.fumbleExitEffect.hint"),
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      [EXIT_EFFECTS.CURRENT]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.current"),
+      [EXIT_EFFECTS.ICE_SHATTER]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.iceShatter")
+    },
+    default: EXIT_EFFECTS.CURRENT
+  });
 }
 
 function onRenderChatMessageHTML(message) {
@@ -87,7 +161,7 @@ function onRenderChatMessageHTML(message) {
     if (!isCritical && !isFumble) return;
     if (globalThis.__critBannerShown.has(message.id)) return;
 
-    const nom_pj = message.speaker?.alias || "Inconnu";
+    const nom_pj = message.speaker?.alias || game.user?.name || "Inconnu";
     const user = message.author;
     const couleur =
       user?.color?.css ??
@@ -158,9 +232,23 @@ function showRubanOnce({ messageId, nom_pj, couleur, type }) {
   showRollRuban(nom_pj, couleur, type);
 }
 
+function showBannerManually({
+  type = "critical",
+  name = game.user?.character?.name || game.user?.name || "Inconnu",
+  color = game.user?.color?.css ?? game.user?.color?.toString?.() ?? game.user?.color ?? "#8b0000"
+} = {}) {
+  if (!game.settings.get(MODULE_ID, "enableBanner")) return;
+  if (type !== "critical" && type !== "fumble") type = "critical";
+
+  requestAnimationFrame(() => {
+    showRollRuban(name, color, type);
+  });
+}
+
 function showRollRuban(nom_pj, couleur, type = "critical") {
-  const id = "critical-ruban";
-  document.getElementById(id)?.remove();
+  const id = `critical-ruban-${foundry.utils.randomID()}`;
+  const slotIndex = acquireBannerSlot();
+  const slotStyle = getBannerSlotStyle(slotIndex);
 
   const isFumble = type === "fumble";
   const isCritical = type === "critical";
@@ -179,10 +267,10 @@ function showRollRuban(nom_pj, couleur, type = "critical") {
     ? game.i18n.localize("CRITICAL_RUBAN.ruban.label.criticalFailure")
     : game.i18n.localize("CRITICAL_RUBAN.ruban.label.criticalSuccess");
 
-  const mainExtraClass = [
-    isFumble ? "no-icon broken" : "",
-    isCritical ? "golden" : ""
-  ].filter(Boolean).join(" ");
+const mainExtraClass = [
+  isFumble ? "broken" : "",
+  isCritical ? "golden" : ""
+].filter(Boolean).join(" ");
 
   const iconHTML = isFumble
     ? `<img src="modules/${MODULE_ID}/assets/fumble.svg" class="crit-d20" aria-hidden="true">`
@@ -190,6 +278,9 @@ function showRollRuban(nom_pj, couleur, type = "critical") {
 
   const div = document.createElement("div");
   div.id = id;
+  div.dataset.type = type;
+  div.dataset.exitEffect = getExitEffect(type);
+  div.dataset.slotIndex = String(slotIndex);
 
   div.innerHTML = `
     <div class="crit-ribbon-wrap crit-enter ${isFumble ? "is-fumble" : "is-critical"}">
@@ -204,6 +295,8 @@ function showRollRuban(nom_pj, couleur, type = "critical") {
           border-color: ${accent};
         ">
           <div class="crit-shine"></div>
+          <div class="crit-frost-overlay" aria-hidden="true"></div>
+          <div class="crit-crack-overlay" aria-hidden="true"></div>
           ${iconHTML}
           <span class="crit-text">${label} : ${nom_pj}</span>
         </div>
@@ -215,10 +308,10 @@ function showRollRuban(nom_pj, couleur, type = "critical") {
 
   Object.assign(div.style, {
     position: "fixed",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    zIndex: "10000",
+    top: slotStyle.top,
+    left: slotStyle.left,
+    transform: slotStyle.transform,
+    zIndex: String(10000 - slotIndex),
     pointerEvents: "none"
   });
 
@@ -240,12 +333,145 @@ function showRollRuban(nom_pj, couleur, type = "critical") {
   playRubanSound(type);
 
   const wrap = div.querySelector(".crit-ribbon-wrap");
-  setTimeout(() => {
-    wrap.classList.remove("crit-enter");
-    wrap.classList.add("crit-exit");
-  }, 3000);
+  scheduleRubanExit(div, wrap, type);
+}
 
-  setTimeout(() => div.remove(), 4300);
+function getExitEffect(type) {
+  return game.settings.get(
+    MODULE_ID,
+    type === "fumble" ? "fumbleExitEffect" : "criticalExitEffect"
+  );
+}
+
+function scheduleRubanExit(div, wrap, type) {
+  /*const effect = getExitEffect(type);
+  const timings = EXIT_TIMINGS[effect] ?? EXIT_TIMINGS.current;
+  const slotIndex = Number(div.dataset.slotIndex);
+
+  setTimeout(() => {
+    playExitEffect(div, wrap, type, effect);
+  }, timings.startDelay);
+
+  setTimeout(() => {
+    releaseBannerSlot(slotIndex);
+    div.remove();
+  }, timings.startDelay + timings.totalDuration + 180);*/
+}
+
+function playExitEffect(div, wrap, type, effect) {
+  if (effect === EXIT_EFFECTS.ICE_SHATTER && type === "fumble") {
+    playIceShatterExit(div, wrap);
+    return;
+  }
+
+  wrap.classList.remove("crit-enter");
+  wrap.classList.add("crit-exit");
+}
+
+function playIceShatterExit(div, wrap) {
+  const timings = EXIT_TIMINGS.iceShatter;
+  const main = wrap.querySelector(".crit-main");
+  const mainWrap = wrap.querySelector(".crit-main-wrap");
+  const tails = [...wrap.querySelectorAll(".crit-tail")];
+  const folds = [...wrap.querySelectorAll(".crit-fold-under")];
+
+  wrap.classList.remove("crit-enter");
+  wrap.classList.add("crit-exit-ice");
+
+  main.classList.add("ice-freezing");
+  tails.forEach((el) => el.classList.add("ice-freezing"));
+  folds.forEach((el) => el.classList.add("ice-freezing"));
+
+  setTimeout(() => {
+    wrap.classList.add("ice-cracking");
+  }, Math.max(120, timings.freezeDuration - 70));
+
+  setTimeout(() => {
+    shatterMainBanner(div, mainWrap, main, {
+      shatterDuration: timings.shatterDuration
+    });
+
+    tails.forEach((el) => el.classList.add("ice-fade-out"));
+    folds.forEach((el) => el.classList.add("ice-fade-out"));
+  }, timings.freezeDuration + timings.crackDuration);
+}
+
+function shatterMainBanner(container, mainWrap, main, { shatterDuration = 700 } = {}) {
+  if (!container?.isConnected || !mainWrap || !main) return;
+
+  const existingLayer = container.querySelector(".crit-shatter-layer");
+  if (existingLayer) existingLayer.remove();
+
+  const layer = document.createElement("div");
+  layer.className = "crit-shatter-layer";
+
+  const columns = 4;
+  const rows = 3;
+  const pieceWidth = main.offsetWidth / columns;
+  const pieceHeight = main.offsetHeight / rows;
+
+  const centerX = main.offsetWidth / 2;
+  const centerY = main.offsetHeight / 2;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      const piece = document.createElement("div");
+      piece.className = "crit-shatter-piece";
+
+      const x = col * pieceWidth;
+      const y = row * pieceHeight;
+
+      const shardCenterX = x + pieceWidth / 2;
+      const shardCenterY = y + pieceHeight / 2;
+
+      const dx = shardCenterX - centerX;
+      const dy = shardCenterY - centerY;
+      const distanceFactor = Math.max(0.65, Math.min(1.35, Math.hypot(dx, dy) / 120 + 0.7));
+
+      const driftX = (dx * 0.26) + randomBetween(-34, 34) * distanceFactor;
+      const driftY = 58 + (Math.abs(dy) * 0.3) + randomBetween(18, 62) * distanceFactor;
+      const rotate = randomBetween(-28, 28);
+      const delay = randomBetween(0, 90);
+
+      piece.style.left = `${x}px`;
+      piece.style.top = `${y}px`;
+      piece.style.width = `${pieceWidth}px`;
+      piece.style.height = `${pieceHeight}px`;
+      piece.style.backgroundImage = getComputedStyle(main).backgroundImage;
+      piece.style.backgroundSize = `${main.offsetWidth}px ${main.offsetHeight}px`;
+      piece.style.backgroundPosition = `${-x}px ${-y}px`;
+      piece.style.borderColor = getComputedStyle(main).borderColor;
+      piece.style.clipPath = pickRandom(ICE_SHARD_POLYGONS);
+      piece.style.setProperty("--drift-x", `${driftX}px`);
+      piece.style.setProperty("--drift-y", `${driftY}px`);
+      piece.style.setProperty("--rotate", `${rotate}deg`);
+      piece.style.setProperty("--shard-blur", `${randomBetween(0, 1.2).toFixed(2)}px`);
+      piece.style.animationDuration = `${shatterDuration}ms`;
+      piece.style.animationDelay = `${delay}ms`;
+
+      layer.appendChild(piece);
+    }
+  }
+
+  createIceParticles(layer, 18, main.offsetWidth, main.offsetHeight, shatterDuration);
+
+  main.classList.add("ice-hidden");
+  mainWrap.appendChild(layer);
+}
+
+function createIceParticles(container, count, width, height, duration) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "crit-ice-particle";
+    p.style.left = `${randomBetween(width * 0.08, width * 0.92)}px`;
+    p.style.top = `${randomBetween(height * 0.08, height * 0.82)}px`;
+    p.style.setProperty("--drift-x", `${randomBetween(-74, 74)}px`);
+    p.style.setProperty("--drift-y", `${randomBetween(45, 140)}px`);
+    p.style.setProperty("--rotate", `${randomBetween(-65, 65)}deg`);
+    p.style.setProperty("--particle-scale", `${randomBetween(0.7, 1.25).toFixed(2)}`);
+    p.style.animationDuration = `${Math.max(500, duration - 60)}ms`;
+    container.appendChild(p);
+  }
 }
 
 function playRubanSound(type) {
@@ -355,4 +581,33 @@ function shiftColorTowardRed(hex, redPull = 0.35, darken = 0.25) {
   b = b * (1 - darken);
 
   return rgbToHex(r, g, b);
+}
+
+function randomBetween(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function pickRandom(values) {
+  return values[Math.floor(Math.random() * values.length)];
+}
+
+function acquireBannerSlot() {
+  for (let i = 0; i < BANNER_SLOTS.length; i++) {
+    if (!globalThis.__critBannerSlots.has(i)) {
+      globalThis.__critBannerSlots.set(i, true);
+      return i;
+    }
+  }
+
+  // Si tous les slots sont occupés, on réutilise le dernier
+  return BANNER_SLOTS.length - 1;
+}
+
+function releaseBannerSlot(slotIndex) {
+  if (typeof slotIndex !== "number") return;
+  globalThis.__critBannerSlots.delete(slotIndex);
+}
+
+function getBannerSlotStyle(slotIndex) {
+  return BANNER_SLOTS[slotIndex] ?? BANNER_SLOTS[0];
 }

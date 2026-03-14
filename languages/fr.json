@@ -14,15 +14,29 @@
         "hint": "Volume des sons du module."
       },
       "criticalSoundPath": {
-        "name": "Son personnalisé - réussite critique",
+        "name": "Son personnalisé – réussite critique",
         "hint": "Laisser vide pour utiliser le son par défaut. Seul le MJ peut choisir un fichier audio personnalisé."
       },
       "fumbleSoundPath": {
-        "name": "Son personnalisé - échec critique",
+        "name": "Son personnalisé – échec critique",
         "hint": "Laisser vide pour utiliser le son par défaut. Seul le MJ peut choisir un fichier audio personnalisé."
       },
-      "resetDefaultSound": "Réinitialiser son par défaut"
+
+      "criticalExitEffect": {
+        "name": "Effet de sortie – réussite critique",
+        "hint": "Choisit l'animation de disparition du ruban lors d'une réussite critique."
+      },
+      "fumbleExitEffect": {
+        "name": "Effet de sortie – échec critique",
+        "hint": "Choisit l'animation de disparition du ruban lors d'un échec critique."
+      },
+
+      "exitEffectChoices": {
+        "current": "Animation par défaut",
+        "iceShatter": "Gel puis casse"
+      }
     },
+
     "ruban": {
       "label": {
         "criticalSuccess": "Réussite critique",
