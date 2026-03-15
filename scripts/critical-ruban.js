@@ -15,7 +15,9 @@ const BANNER_SLOTS = [
 const EXIT_EFFECTS = {
   CURRENT: "current",
   ICE_SHATTER: "iceShatter",
-  FIRE_BURN: "fireBurn"
+  FIRE_BURN: "fireBurn",
+  FROZEN_GLORY: "frozenGlory",
+  BLAZING_GLORY: "blazingGlory"
 };
 
 const EXIT_TIMINGS = {
@@ -36,6 +38,20 @@ const EXIT_TIMINGS = {
     burnDuration: 820,
     emberDuration: 520,
     totalDuration: 1750
+  },
+  frozenGlory: {
+    startDelay: 3000,
+    frostDuration: 320,
+    crystalDuration: 720,
+    dissolveDuration: 420,
+    totalDuration: 1600
+  },
+  blazingGlory: {
+    startDelay: 3000,
+    chargeDuration: 280,
+    flameDuration: 700,
+    flareDuration: 360,
+    totalDuration: 1500
   }
 };
 
@@ -132,7 +148,9 @@ function registerSettings() {
     config: true,
     type: String,
     choices: {
-      [EXIT_EFFECTS.CURRENT]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.current")
+      [EXIT_EFFECTS.CURRENT]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.current"),
+      [EXIT_EFFECTS.FROZEN_GLORY]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.frozenGlory"),
+      [EXIT_EFFECTS.BLAZING_GLORY]: game.i18n.localize("CRITICAL_RUBAN.settings.exitEffectChoices.blazingGlory")
     },
     default: EXIT_EFFECTS.CURRENT
   });
@@ -309,6 +327,13 @@ const mainExtraClass = [
           <div class="crit-fire-overlay" aria-hidden="true"></div>
           <div class="crit-burn-overlay" aria-hidden="true"></div>
           <div class="crit-heat-overlay" aria-hidden="true"></div>
+          <div class="crit-glory-overlay" aria-hidden="true"></div>
+          <div class="crit-glory-flare-overlay" aria-hidden="true"></div>
+          <div class="crit-glory-heat-overlay" aria-hidden="true"></div>
+          <div class="crit-frozen-overlay" aria-hidden="true"></div>
+          <div class="crit-crystal-overlay" aria-hidden="true"></div>
+          <div class="crit-frost-light-overlay" aria-hidden="true"></div>
+          <div class="crit-frost-branches-overlay" aria-hidden="true"></div>
           ${iconHTML}
           <span class="crit-text">${label} : ${nom_pj}</span>
         </div>
@@ -376,8 +401,18 @@ function playExitEffect(div, wrap, type, effect) {
     return;
   }
 
-  if (effect === EXIT_EFFECTS.FIRE_BURN) {
+  if (effect === EXIT_EFFECTS.FIRE_BURN && type === "fumble") {
     playFireBurnExit(div, wrap);
+    return;
+  }
+
+  if (effect === EXIT_EFFECTS.FROZEN_GLORY && type === "critical") {
+    playFrozenGloryExit(div, wrap);
+    return;
+  }
+
+  if (effect === EXIT_EFFECTS.BLAZING_GLORY && type === "critical") {
+    playBlazingGloryExit(div, wrap);
     return;
   }
 
@@ -680,6 +715,119 @@ function createEmberParticles(container, count, duration) {
     p.style.setProperty("--drift-y", `${randomBetween(35, 120)}px`);
     p.style.setProperty("--ember-scale", `${randomBetween(0.7, 1.35).toFixed(2)}`);
     p.style.animationDuration = `${duration + randomBetween(-80, 120)}ms`;
+
+    container.appendChild(p);
+  }
+}
+
+function playBlazingGloryExit(div, wrap) {
+  const timings = EXIT_TIMINGS.blazingGlory;
+
+  const main = wrap.querySelector(".crit-main");
+  const tails = [...wrap.querySelectorAll(".crit-tail")];
+  const folds = [...wrap.querySelectorAll(".crit-fold-under")];
+
+  wrap.classList.remove("crit-enter");
+  wrap.classList.add("crit-exit-glory");
+
+  main.classList.add("glory-charging");
+  tails.forEach(el => el.classList.add("glory-charging"));
+  folds.forEach(el => el.classList.add("glory-charging"));
+
+  setTimeout(() => {
+    wrap.classList.add("glory-burning");
+
+    main.classList.add("glory-burning");
+    tails.forEach(el => el.classList.add("glory-burning"));
+    folds.forEach(el => el.classList.add("glory-burning"));
+
+    createGloryParticles(div, 16, timings.flareDuration);
+  }, timings.chargeDuration);
+
+  setTimeout(() => {
+    main.classList.add("glory-flare");
+    tails.forEach(el => el.classList.add("glory-flare"));
+    folds.forEach(el => el.classList.add("glory-flare"));
+  }, timings.chargeDuration + timings.flameDuration * 0.55);
+
+  setTimeout(() => {
+    main.classList.add("glory-hidden");
+    tails.forEach(el => el.classList.add("glory-hidden"));
+    folds.forEach(el => el.classList.add("glory-hidden"));
+  }, timings.chargeDuration + timings.flameDuration);
+}
+
+function createGloryParticles(container, count, duration) {
+  const width = container.offsetWidth;
+  const height = container.offsetHeight;
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "crit-glory-particle";
+
+    p.style.left = `${randomBetween(width * 0.18, width * 0.82)}px`;
+    p.style.top = `${randomBetween(height * 0.45, height * 0.88)}px`;
+    p.style.setProperty("--drift-x", `${randomBetween(-45, 45)}px`);
+    p.style.setProperty("--drift-y", `${randomBetween(-130, -40)}px`);
+    p.style.setProperty("--glory-scale", `${randomBetween(0.7, 1.25).toFixed(2)}`);
+    p.style.animationDuration = `${duration + randomBetween(-60, 120)}ms`;
+
+    container.appendChild(p);
+  }
+}
+
+function playFrozenGloryExit(div, wrap) {
+
+  const timings = EXIT_TIMINGS.frozenGlory;
+
+  const main = wrap.querySelector(".crit-main");
+  const tails = [...wrap.querySelectorAll(".crit-tail")];
+  const folds = [...wrap.querySelectorAll(".crit-fold-under")];
+
+  wrap.classList.remove("crit-enter");
+  wrap.classList.add("crit-exit-frozen");
+
+  main.classList.add("frozen-glory-start");
+  tails.forEach(el => el.classList.add("frozen-glory-start"));
+  folds.forEach(el => el.classList.add("frozen-glory-start"));
+
+  setTimeout(() => {
+
+    wrap.classList.add("frozen-glory-crystal");
+
+    main.classList.add("frozen-glory-crystal");
+    tails.forEach(el => el.classList.add("frozen-glory-crystal"));
+    folds.forEach(el => el.classList.add("frozen-glory-crystal"));
+
+    createFrozenGloryParticles(div, 14, timings.crystalDuration);
+
+  }, timings.frostDuration);
+
+
+  setTimeout(() => {
+
+    main.classList.add("frozen-glory-hidden");
+    tails.forEach(el => el.classList.add("frozen-glory-hidden"));
+    folds.forEach(el => el.classList.add("frozen-glory-hidden"));
+
+  }, timings.frostDuration + timings.crystalDuration);
+
+}
+
+function createFrozenGloryParticles(container, count, duration) {
+  const width = container.offsetWidth;
+  const height = container.offsetHeight;
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "crit-frozen-glory-particle";
+
+    p.style.left = `${randomBetween(width * 0.18, width * 0.82)}px`;
+    p.style.top = `${randomBetween(height * 0.32, height * 0.78)}px`;
+    p.style.setProperty("--drift-x", `${randomBetween(-42, 42)}px`);
+    p.style.setProperty("--drift-y", `${randomBetween(-150, -55)}px`);
+    p.style.setProperty("--crystal-scale", `${randomBetween(0.7, 1.35).toFixed(2)}`);
+    p.style.animationDuration = `${duration + randomBetween(-80, 140)}ms`;
 
     container.appendChild(p);
   }

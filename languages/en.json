@@ -34,7 +34,9 @@
       "exitEffectChoices": {
         "current": "Default animation",
         "iceShatter": "Freeze and shatter",
-        "fireBurn": "Burn away"
+        "fireBurn": "Burn away",
+        "frozenGlory": "Frozen Glory",
+        "blazingGlory": "Blazing Glory"
       }
     },
 
