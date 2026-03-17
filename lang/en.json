@@ -1,0 +1,60 @@
+{
+  "critical-ruban": {
+    "text": {
+      "critical": "Critical Success",
+      "fumble": "Critical Failure"
+    },
+    "choices": {
+      "displayMode": {
+        "all": "Everyone",
+        "gm": "GM only",
+        "self": "Each user only for their own rolls"
+      },
+      "exitEffect": {
+        "current": "Default",
+        "frozenGlory": "Frozen Glory",
+        "blazingGlory": "Blazing Glory",
+        "iceShatter": "Ice Shatter",
+        "fireBurn": "Fire Burn"
+      }
+    },
+    "settings": {
+      "enableBanner": {
+        "name": "Show banners",
+        "hint": "Displays a banner on critical successes and critical failures."
+      },
+      "enableSound": {
+        "name": "Play sounds",
+        "hint": "Plays a sound when a banner is displayed."
+      },
+      "soundVolume": {
+        "name": "Sound volume",
+        "hint": "Volume of the module sounds."
+      },
+      "criticalSoundPath": {
+        "name": "Custom sound - critical success",
+        "hint": "Leave empty to play no custom sound."
+      },
+      "fumbleSoundPath": {
+        "name": "Custom sound - critical failure",
+        "hint": "Leave empty to play no custom sound."
+      },
+      "displayMode": {
+        "name": "Display",
+        "hint": "Choose who can see the banners."
+      },
+      "bannerDuration": {
+        "name": "Display duration",
+        "hint": "Banner display duration in milliseconds."
+      },
+      "criticalExitEffect": {
+        "name": "Exit effect - critical success",
+        "hint": "Kept for a future version."
+      },
+      "fumbleExitEffect": {
+        "name": "Exit effect - critical failure",
+        "hint": "Kept for a future version."
+      }
+    }
+  }
+}

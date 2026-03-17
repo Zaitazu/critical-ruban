@@ -1,5 +1,5 @@
 {
-  "CRITICAL_RUBAN": {
+  "critical-ruban": {
     "settings": {
       "enableBanner": {
         "name": "Afficher les rubans",

@@ -1,8 +1,8 @@
 {
   "id": "critical-ruban",
   "title": "Critical Ruban",
-  "description": "Affiche un ruban animé lors d'une réussite critique.",
-  "version": "2.0.0",
+  "description": "Displays animated PIXI banners for critical successes and critical failures.",
+  "version": "3.0.0",
   "authors": [
     {
       "name": "Zaitazu"
@@ -12,34 +12,27 @@
     "minimum": "13",
     "verified": "13"
   },
-  "esmodules": [
+  "scripts": [
+    "scripts/critical-ruban-utils.js",
+    "scripts/critical-ruban-banner.js",
+    "scripts/critical-ruban-settings.js",
     "scripts/critical-ruban.js"
-  ],
-  "styles": [
-    "styles/critical-ruban.css"
   ],
   "languages": [
     {
       "lang": "fr",
       "name": "Français",
-      "path": "languages/fr.json"
+      "path": "lang/fr.json"
     },
     {
       "lang": "en",
       "name": "English",
-      "path": "languages/en.json"
+      "path": "lang/en.json"
     }
   ],
   "relationships": {
-    "systems": [
-      {
-        "id": "dnd5e",
-        "type": "system",
-        "compatibility": {}
-      }
-    ]
+    "requires": []
   },
-
   "url": "https://github.com/Zaitazu/critical-ruban",
   "manifest": "https://github.com/Zaitazu/critical-ruban/releases/download/2.0.0/module.json",
   "download": "https://github.com/Zaitazu/critical-ruban/releases/download/2.0.0/critical-ruban.zip",
