@@ -163,7 +163,6 @@ class CritBanner {
   }
 
   buildDisplay() {
-    //this.motion.addChild(this.shatterFlash);
     this.leftTail = this.drawTail(true);
     this.rightTail = this.drawTail(false);
     this.body = this.drawBody();
@@ -929,6 +928,7 @@ class CritBanner {
   update(dtMS) {
     this.elapsed += dtMS;
     this.stateTime += dtMS;
+    this.lastDtMS = dtMS;
 
     if (this.state === "enter") {
       this.updateEnter();
@@ -1035,9 +1035,10 @@ class CritBanner {
 
     
     if (t <= 0.42) {
-      const flashT = clamp01((freezeT - 0.84) / 0.16);
-      this.shatterFlash.alpha = Math.sin(flashT * Math.PI) * 0.35;
       const e = easeOutCubic(freezeT);
+      const flashT = clamp01((freezeT - 0.84) / 0.16);
+
+      this.shatterFlash.alpha = Math.sin(flashT * Math.PI) * 0.35;
       this.motion.tint = mixHex(0xffffff, COLORS.ice, e * 0.35);
       this.root.alpha = 1;
       this.root.position.set(this.baseX, this.baseY);
@@ -1059,6 +1060,8 @@ class CritBanner {
       this.shatterStarted = true;
       this.motion.tint = 0xffffff;
       this.shatterFlash.alpha = 0;
+      this.freezeOverlay.alpha = 0;
+      this.crackLines.alpha = 0;
       this.createShatterShards();
       this.bodyGroup.visible = false;
       if (this.freezeOverlay) this.freezeOverlay.visible = false;
@@ -1071,7 +1074,7 @@ class CritBanner {
     this.motion.scale.set(this.baseScale);
     this.motion.rotation = this.baseRotation;
 
-    const dt = 16.67 / 1000;
+    const dt = (this.lastDtMS ?? 16.67) / 1000;
 
     for (const s of this.shards) {
       if (s.delay > 0) {
