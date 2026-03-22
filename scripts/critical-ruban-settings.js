@@ -68,4 +68,46 @@ function registerSettings() {
     choices: globalThis.CriticalRubanEffects.getChoicesForType("fumble"),
     default: DEFAULT_EFFECT_ID
   });
+
+  game.settings.register(MODULE_ID, "bannerScale", {
+    name: game.i18n.localize("critical-ruban.settings.bannerScale.name"),
+    hint: game.i18n.localize("critical-ruban.settings.bannerScale.hint"),
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 50, max: 120, step: 5 },
+    default: 100
+  });
+
+  game.settings.register(MODULE_ID, "bannerPosX", {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: null
+  });
+
+  game.settings.register(MODULE_ID, "bannerPosY", {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: null
+  });
+
+  game.settings.register(MODULE_ID, "useCustomPos", {
+    name: game.i18n.localize("critical-ruban.settings.useCustomPos.name"),
+    hint: game.i18n.localize("critical-ruban.settings.useCustomPos.hint"),
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
+  game.settings.registerMenu(MODULE_ID, "pickPositionMenu", {
+    name: game.i18n.localize("critical-ruban.settings.pickPosition.name"),
+    label: game.i18n.localize("critical-ruban.settings.pickPosition.label"),
+    hint: game.i18n.localize("critical-ruban.settings.pickPosition.hint"),
+    icon: "fas fa-crosshairs",
+    type: BannerPositionPicker,
+    restricted: false
+  });
 }

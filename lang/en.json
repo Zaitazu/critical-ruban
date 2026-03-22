@@ -41,6 +41,34 @@
         "voidCrystalBloom": "Void bloom",
         "maddeningGrip": "Maddening grip",
         "demonCrownShatter": "Shattered demon crown"
+      },
+
+      "bannerScale": {
+        "name": "Banner size",
+        "hint": "Adjusts banner size as a percentage."
+      },
+
+      "useCustomPos": {
+        "name": "Use Custom Position",
+        "hint": "Display banners around a user-defined screen position."
+      },
+      
+      "pickPosition": {
+        "name": "Banner position",
+        "label": "Configure",
+        "hint": "Opens the visual banner placement tool."
+      },
+      "positionPicker": {
+        "title": "Banner position",
+        "description": "Place the banner on screen using a real preview.",
+        "pickButton": "Choose position",
+        "resetButton": "Reset",
+        "help": "Move the mouse to position the banner, click to confirm, Escape to cancel.",
+        "saveNotification": "Banner position saved.",
+        "resetNotification": "Banner position reset.",
+        "cancelNotification": "Placement cancelled.",
+        "previewName": "Preview",
+        "managerError": "Unable to initialize the banner manager."
       }
     },
 

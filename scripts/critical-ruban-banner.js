@@ -102,8 +102,7 @@ class CritBanner {
     this.root.eventMode = "none";
     this.root.interactiveChildren = false;
     this.root.alpha = 0.01;
-
-    this.motion = new PIXI.Container();
+        this.motion = new PIXI.Container();
     this.motion.sortableChildren = true;
     this.root.addChild(this.motion);
 
@@ -203,7 +202,7 @@ class CritBanner {
     visible = true
   } = {}) {
     const target = this[parent];
-    if (!target) throw new Error(`Unknown parent container: ${parent}`);
+        if (!target) throw new Error(`Unknown parent container: ${parent}`);
 
     displayObject.alpha = alpha;
     displayObject.visible = visible;
@@ -298,7 +297,7 @@ class CritBanner {
     const iy = y + 4;
     const iw = w - 8;
     const ih = h - 8;
-    const iTopInset = 14;
+        const iTopInset = 14;
 
     g.moveTo(ix + iTopInset, iy);
 
@@ -398,7 +397,7 @@ class CritBanner {
     g.bezierCurveTo(
       sign * 12, halfH * 0.32,
       sign * 12, -halfH * 0.32,
-      sign * 4, -halfH + 4
+            sign * 4, -halfH + 4
     );
     g.endFill();
 
@@ -498,7 +497,7 @@ class CritBanner {
       alpha = 1,
       vx = 0,
       vy = 0,
-      vr = 0,
+            vr = 0,
       life = 600,
       scaleFrom = 1,
       scaleTo = 0.2
@@ -598,7 +597,7 @@ class CritBanner {
 
     const sprite = new PIXI.Sprite(croppedTexture);
     sprite.x = 0;
-    sprite.y = 0;
+        sprite.y = 0;
 
     const localPts = [];
     for (let i = 0; i < points.length; i += 2) {
@@ -640,20 +639,67 @@ class CritBanner {
   }
 
   applySlot() {
-    const screen = canvas?.app?.renderer?.screen ?? { width: window.innerWidth, height: window.innerHeight };
+    const screen = canvas?.app?.renderer?.screen ?? {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+
     const slot = BANNER_SLOTS[this.slotIndex] ?? BANNER_SLOTS[0];
-    this.baseX = screen.width * slot.x;
-    this.baseY = screen.height * slot.y;
-    this.baseScale = slot.scale;
+    const userScale = (game.settings.get(MODULE_ID, "bannerScale") ?? 100) / 100;
+
+    const useCustom = game.settings.get(MODULE_ID, "useCustomPos");
+    const customX = game.settings.get(MODULE_ID, "bannerPosX");
+    const customY = game.settings.get(MODULE_ID, "bannerPosY");
+
+    let anchorX = 0.5;
+    let anchorY = 0.5;
+
+    if (useCustom && customX !== null && customY !== null) {
+      anchorX = customX;
+      anchorY = customY;
+    }
+
+    const offsetX = (slot.x - 0.5) * screen.width;
+    const offsetY = (slot.y - 0.5) * screen.height;
+
+    this.baseX = screen.width * anchorX + offsetX;
+    this.baseY = screen.height * anchorY + offsetY;
+    this.baseScale = slot.scale * userScale;
     this.baseRotation = slot.rotation;
+
     this.root.position.set(this.baseX, this.baseY);
     this.motion.scale.set(this.baseScale);
     this.motion.rotation = this.baseRotation;
   }
 
   update(dtMS) {
+    if (this.isPreview) {
+      this.elapsed += dtMS;
+      this.stateTime += dtMS;
+      this.lastDtMS = dtMS;
+
+      const glow = 0.48 + Math.sin((this.elapsed / 1000) * 4.8 + this.floatSeed) * 0.08;
+      const shinePulse = ((this.elapsed / 1000) + this.shineSeed) % 1.85;
+      const shineT = clamp01((shinePulse - 0.15) / 0.55);
+
+      this.root.alpha = 1;
+      this.motion.scale.set(this.baseScale);
+      this.motion.rotation = this.baseRotation;
+      this.motion.tint = 0xffffff;
+
+      this.innerGlow.alpha = glow;
+      this.shine.alpha = shinePulse > 0.15 && shinePulse < 0.70
+        ? Math.sin(shineT * Math.PI) * 0.30
+        : 0;
+      this.shine.x = lerp(-this.mainWidth * 0.7, this.mainWidth * 0.7, easeInOutQuad(shineT));
+
+      this.effect.onHold?.(this, 0, dtMS);
+      this.updateParticles(dtMS);
+      return;
+    }
+
     this.elapsed += dtMS;
-    this.stateTime += dtMS;
+        this.stateTime += dtMS;
     this.lastDtMS = dtMS;
 
     if (this.state === "enter") {
@@ -754,8 +800,7 @@ class CritBanner {
       p.sprite.x += p.vx * (dtMS / 1000);
       p.sprite.y += p.vy * (dtMS / 1000);
       p.sprite.rotation += p.vr ?? 0;
-
-      const scale = lerp(p.scaleFrom ?? 1, p.scaleTo ?? 0.3, t);
+            const scale = lerp(p.scaleFrom ?? 1, p.scaleTo ?? 0.3, t);
       p.sprite.scale.set(scale);
       p.sprite.alpha = (p.startAlpha ?? 1) * (1 - easeInQuad(t));
 
@@ -815,3 +860,210 @@ class CritBanner {
     }
   }
 }
+
+function hideFoundryWindowsForBannerPlacement() {
+  const hidden = [];
+
+  for (const app of Object.values(ui.windows ?? {})) {
+    const element = app?.element?.[0];
+    if (!element) continue;
+
+    const computed = window.getComputedStyle(element);
+    if (computed.display === "none") continue;
+
+    hidden.push(app.appId);
+    element.dataset.critRubanPrevDisplay = element.style.display ?? "";
+    element.style.display = "none";
+  }
+
+  return hidden;
+}
+
+function restoreFoundryWindowsForBannerPlacement(hiddenAppIds = []) {
+  for (const appId of hiddenAppIds) {
+    const app = ui.windows?.[appId];
+    const element = app?.element?.[0];
+    if (!element) continue;
+
+    const prev = element.dataset.critRubanPrevDisplay;
+    element.style.display = prev ?? "";
+    delete element.dataset.critRubanPrevDisplay;
+  }
+}
+
+function destroyBannerPositionPreview() {
+  const preview = globalThis.__critBannerPositionPreview;
+  if (!preview) return;
+
+  try {
+    preview.cleanup?.();
+  } catch (err) {
+    console.warn(`${MODULE_ID} | Erreur cleanup preview :`, err);
+  }
+
+  try {
+    if (preview.manager && preview.banner) {
+      preview.manager.removeBanner(preview.banner);
+    }
+  } catch (err) {
+    console.warn(`${MODULE_ID} | Erreur suppression ruban preview :`, err);
+  }
+
+  try {
+    if (preview.overlay?.parentNode) {
+      preview.overlay.parentNode.removeChild(preview.overlay);
+    }
+      } catch (err) {
+    console.warn(`${MODULE_ID} | Erreur suppression overlay preview :`, err);
+  }
+
+  try {
+    restoreFoundryWindowsForBannerPlacement(preview.hiddenWindows ?? []);
+  } catch (err) {
+    console.warn(`${MODULE_ID} | Erreur restauration fenêtres :`, err);
+  }
+
+  globalThis.__critBannerPositionPreview = null;
+}
+
+async function openPixiBannerPositionPicker() {
+  destroyBannerPositionPreview();
+
+  const manager = getBannerManager();
+  if (!manager) {
+    ui.notifications.error(
+      game.i18n.localize("critical-ruban.positionPicker.managerError")
+    );
+    return;
+  }
+
+  const preview = new CritBanner({
+    slotIndex: 0,
+    type: "critical",
+    label: game.i18n.localize("critical-ruban.ruban.label.criticalSuccess"),
+    name: game.i18n.localize("critical-ruban.positionPicker.previewName"),
+    color: game.user?.color?.css ?? game.user?.color?.toString?.() ?? game.user?.color ?? "#8b0000",
+    exitEffect: DEFAULT_EFFECT_ID
+  });
+
+  preview.isPreview = true;
+  preview.state = "hold";
+  preview.stateTime = 0;
+  preview.elapsed = 0;
+  preview.enterDuration = 0;
+  preview.holdDuration = Number.MAX_SAFE_INTEGER;
+  preview.exitDuration = 0;
+  preview.done = false;
+
+  manager.addBanner(preview);
+
+  const screen = canvas?.app?.renderer?.screen ?? {
+    width: window.innerWidth,
+    height: window.innerHeight
+  };
+
+  const savedX = game.settings.get(MODULE_ID, "bannerPosX");
+  const savedY = game.settings.get(MODULE_ID, "bannerPosY");
+
+  const state = {
+    x: savedX ?? 0.5,
+    y: savedY ?? 0.5
+  };
+
+  preview.root.alpha = 1;
+  preview.motion.rotation = preview.baseRotation;
+  preview.motion.scale.set(preview.baseScale);
+
+  preview.baseX = screen.width * state.x;
+  preview.baseY = screen.height * state.y;
+  preview.root.position.set(preview.baseX, preview.baseY);
+
+  const hiddenWindows = hideFoundryWindowsForBannerPlacement();
+
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.inset = "0";
+  overlay.style.zIndex = "999999";
+  overlay.style.cursor = "crosshair";
+  overlay.style.background = "transparent";
+  overlay.style.pointerEvents = "auto";
+
+  const help = document.createElement("div");
+  help.textContent = game.i18n.localize("critical-ruban.positionPicker.help");
+  help.style.position = "fixed";
+  help.style.left = "50%";
+  help.style.top = "20px";
+  help.style.transform = "translateX(-50%)";
+  help.style.padding = "10px 14px";
+  help.style.borderRadius = "10px";
+  help.style.background = "rgba(0, 0, 0, 0.78)";
+  help.style.color = "white";
+  help.style.fontSize = "14px";
+  help.style.lineHeight = "1.2";
+  help.style.pointerEvents = "none";
+  help.style.boxShadow = "0 4px 14px rgba(0,0,0,0.35)";
+
+  overlay.appendChild(help);
+  document.body.appendChild(overlay);
+
+  function clampPreview(v) {
+    return Math.max(0, Math.min(1, v));
+  }
+
+  function updatePreviewFromClient(clientX, clientY) {
+    state.x = clampPreview(clientX / window.innerWidth);
+    state.y = clampPreview(clientY / window.innerHeight);
+
+    preview.baseX = screen.width * state.x;
+    preview.baseY = screen.height * state.y;
+    preview.root.position.set(preview.baseX, preview.baseY);
+  }
+    const onPointerMove = (ev) => {
+    updatePreviewFromClient(ev.clientX, ev.clientY);
+  };
+
+  const onClick = async (ev) => {
+    updatePreviewFromClient(ev.clientX, ev.clientY);
+
+    await game.settings.set(MODULE_ID, "bannerPosX", state.x);
+    await game.settings.set(MODULE_ID, "bannerPosY", state.y);
+    await game.settings.set(MODULE_ID, "useCustomPos", true);
+
+    destroyBannerPositionPreview();
+    ui.notifications.info(
+      game.i18n.localize("critical-ruban.positionPicker.saveNotification")
+    );
+  };
+
+  const onKeyDown = (ev) => {
+    if (ev.key !== "Escape") return;
+
+    destroyBannerPositionPreview();
+    ui.notifications.info(
+      game.i18n.localize("critical-ruban.positionPicker.cancelNotification")
+    );
+  };
+
+  overlay.addEventListener("pointermove", onPointerMove);
+  overlay.addEventListener("click", onClick);
+  window.addEventListener("keydown", onKeyDown, true);
+
+  globalThis.__critBannerPositionPreview = {
+    manager,
+    banner: preview,
+    overlay,
+    hiddenWindows,
+    cleanup: () => {
+      overlay.removeEventListener("pointermove", onPointerMove);
+      overlay.removeEventListener("click", onClick);
+      window.removeEventListener("keydown", onKeyDown, true);
+    }
+  };
+
+  ui.notifications.info(
+    game.i18n.localize("critical-ruban.positionPicker.help")
+  );
+}
+
+globalThis.openPixiBannerPositionPicker = openPixiBannerPositionPicker;
+globalThis.destroyBannerPositionPreview = destroyBannerPositionPreview;
