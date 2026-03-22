@@ -659,8 +659,8 @@ class CritBanner {
       anchorY = customY;
     }
 
-    const offsetX = (slot.x - 0.5) * screen.width;
-    const offsetY = (slot.y - 0.5) * screen.height;
+    const offsetX = (slot.x - 0.5) * screen.width * userScale;
+    const offsetY = (slot.y - 0.5) * screen.height * userScale;
 
     this.baseX = screen.width * anchorX + offsetX;
     this.baseY = screen.height * anchorY + offsetY;
@@ -1030,18 +1030,24 @@ async function openPixiBannerPositionPicker() {
     await game.settings.set(MODULE_ID, "useCustomPos", true);
 
     destroyBannerPositionPreview();
+
     ui.notifications.info(
       game.i18n.localize("critical-ruban.positionPicker.saveNotification")
     );
+
+    setTimeout(() => game.settings.sheet.render(true), 0);
   };
 
-  const onKeyDown = (ev) => {
+  const onKeyDown = async (ev) => {
     if (ev.key !== "Escape") return;
 
     destroyBannerPositionPreview();
+
     ui.notifications.info(
       game.i18n.localize("critical-ruban.positionPicker.cancelNotification")
     );
+
+    setTimeout(() => game.settings.sheet.render(true), 0);
   };
 
   overlay.addEventListener("pointermove", onPointerMove);
