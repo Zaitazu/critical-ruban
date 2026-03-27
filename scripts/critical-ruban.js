@@ -1,3 +1,9 @@
+Hooks.once("init", () => {
+  initCriticalRubanSystems();
+  exposeCriticalRubanApi();
+  registerNativeCriticalRubanSystems();
+});
+
 Hooks.once("ready", () => {
   registerSettings();
 
@@ -6,11 +12,7 @@ Hooks.once("ready", () => {
   globalThis.__critBannerSlots ??= new Map();
   globalThis.__critBannerManager ??= null;
 
-  globalThis.CriticalRuban = {
-    show: showBannerManually,
-    showCritical: (name, color) => showBannerManually({ type: "critical", name, color }),
-    showFumble: (name, color) => showBannerManually({ type: "fumble", name, color })
-  };
+  Hooks.callAll("critical-ruban:registerSystems", globalThis.CriticalRuban);
 
   Hooks.on("renderChatMessageHTML", onRenderChatMessageHTML);
 
@@ -22,22 +24,27 @@ Hooks.once("ready", () => {
 function onRenderChatMessageHTML(message) {
   try {
     if (!game.settings.get(MODULE_ID, "enableBanner")) return;
-    if (!message?.isRoll || !message?.visible) return;
+    if (!message?.visible) return;
 
-    const roll = message.rolls?.[0];
+    const system = globalThis.CriticalRuban?.getSystem();
+    if (!system) return;
+
+    const roll = system.getRoll(message);
     if (!roll) return;
 
-    const d20Term = roll.terms?.find((t) => t?.faces === 20);
-    if (!d20Term) return;
+    const isCritical = system.isCritical(roll, message);
+    const isFumble = system.isFumble(roll, message);
 
-    const isCritical = roll.isCritical === true;
-    const isFumble = roll.isFumble === true;
     if (!isCritical && !isFumble) return;
     if (globalThis.__critBannerShown.has(message.id)) return;
 
     const nom_pj = message.speaker?.alias || game.user?.name || "Inconnu";
     const user = message.author;
-    const couleur = user?.color?.css ?? user?.color?.toString?.() ?? user?.color ?? "#8b0000";
+    const couleur =
+      user?.color?.css ??
+      user?.color?.toString?.() ??
+      user?.color ??
+      "#8b0000";
 
     const payload = {
       messageId: message.id,
@@ -52,9 +59,13 @@ function onRenderChatMessageHTML(message) {
       if (roll.id) globalThis.__critBannerPending.set(roll.id, payload);
 
       setTimeout(() => {
-        const pending = globalThis.__critBannerPending.get(message.id) || globalThis.__critBannerPending.get(roll.id);
+        const pending =
+          globalThis.__critBannerPending.get(message.id) ||
+          globalThis.__critBannerPending.get(roll.id);
+
         if (pending) consumePendingRuban(pending);
       }, 8000);
+
       return;
     }
 
