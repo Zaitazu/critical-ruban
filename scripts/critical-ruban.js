@@ -29,39 +29,28 @@ function onRenderChatMessageHTML(message) {
     const system = globalThis.CriticalRuban?.getSystem();
     if (!system) return;
 
-    const roll = system.getRoll(message);
-    if (!roll) return;
-
-    const isCritical = system.isCritical(roll, message);
-    const isFumble = system.isFumble(roll, message);
-
-    if (!isCritical && !isFumble) return;
+    const bannerData = system.extractBannerData(message);
+    if (!bannerData) return;
     if (globalThis.__critBannerShown.has(message.id)) return;
-
-    const nom_pj = message.speaker?.alias || game.user?.name || "Inconnu";
-    const user = message.author;
-    const couleur =
-      user?.color?.css ??
-      user?.color?.toString?.() ??
-      user?.color ??
-      "#8b0000";
 
     const payload = {
       messageId: message.id,
-      rollId: roll.id,
-      nom_pj,
-      couleur,
-      type: isCritical ? "critical" : "fumble"
+      rollId: bannerData.rollId ?? null,
+      nom_pj: bannerData.nameActor ?? "Inconnu",
+      couleur: bannerData.color ?? "#8b0000",
+      type: bannerData.type ?? "critical",
+      label: bannerData.label ?? null,
+      effect: bannerData.effect ?? null
     };
 
     if (game.modules.get("dice-so-nice")?.active) {
       if (message.id) globalThis.__critBannerPending.set(message.id, payload);
-      if (roll.id) globalThis.__critBannerPending.set(roll.id, payload);
+      if (payload.rollId) globalThis.__critBannerPending.set(payload.rollId, payload);
 
       setTimeout(() => {
         const pending =
           globalThis.__critBannerPending.get(message.id) ||
-          globalThis.__critBannerPending.get(roll.id);
+          globalThis.__critBannerPending.get(payload.rollId);
 
         if (pending) consumePendingRuban(pending);
       }, 8000);
@@ -92,7 +81,7 @@ function consumePendingRuban(payload) {
   requestAnimationFrame(() => showRubanOnce(payload));
 }
 
-function showRubanOnce({ messageId, nom_pj, couleur, type }) {
+function showRubanOnce({ messageId, nom_pj, couleur, type, label, effect }) {
   if (messageId && globalThis.__critBannerShown.has(messageId)) return;
 
   if (messageId) {
@@ -100,7 +89,7 @@ function showRubanOnce({ messageId, nom_pj, couleur, type }) {
     setTimeout(() => globalThis.__critBannerShown.delete(messageId), 10000);
   }
 
-  showRollRuban(nom_pj, couleur, type);
+  showRollRuban(nom_pj, couleur, type, label, effect);
 }
 
 function showBannerManually({
@@ -113,7 +102,7 @@ function showBannerManually({
   requestAnimationFrame(() => showRollRuban(name, color, type));
 }
 
-function showRollRuban(nom_pj, couleur, type = "critical") {
+function showRollRuban(nom_pj, couleur, type = "critical", label = null, effect = null) {
   const manager = getBannerManager();
   if (!manager) {
     console.warn(`${MODULE_ID} | Impossible d'initialiser le BannerManager PIXI.`);
@@ -124,12 +113,14 @@ function showRollRuban(nom_pj, couleur, type = "critical") {
   const banner = new CritBanner({
     slotIndex,
     type,
-    label: type === "fumble"
-      ? game.i18n.localize("critical-ruban.ruban.label.criticalFailure")
-      : game.i18n.localize("critical-ruban.ruban.label.criticalSuccess"),
+    label: label ?? (
+      type === "fumble"
+        ? game.i18n.localize("critical-ruban.ruban.label.criticalFailure")
+        : game.i18n.localize("critical-ruban.ruban.label.criticalSuccess")
+    ),
     name: nom_pj,
     color: couleur,
-    exitEffect: getExitEffect(type)
+    exitEffect: effect ?? getExitEffect(type)
   });
 
   manager.addBanner(banner);
