@@ -52,8 +52,9 @@ function registerSettings() {
   game.settings.register(MODULE_ID, "criticalExitEffect", {
     name: game.i18n.localize("critical-ruban.settings.criticalExitEffect.name"),
     hint: game.i18n.localize("critical-ruban.settings.criticalExitEffect.hint"),
-    scope: "client",
+    scope: "world",
     config: true,
+    restricted: true,
     type: String,
     choices: globalThis.CriticalRubanEffects.getChoicesForType("critical"),
     default: DEFAULT_EFFECT_ID
@@ -62,8 +63,9 @@ function registerSettings() {
   game.settings.register(MODULE_ID, "fumbleExitEffect", {
     name: game.i18n.localize("critical-ruban.settings.fumbleExitEffect.name"),
     hint: game.i18n.localize("critical-ruban.settings.fumbleExitEffect.hint"),
-    scope: "client",
+    scope: "world",
     config: true,
+    restricted: true,
     type: String,
     choices: globalThis.CriticalRubanEffects.getChoicesForType("fumble"),
     default: DEFAULT_EFFECT_ID
