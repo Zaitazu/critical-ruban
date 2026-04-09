@@ -1,89 +1,26 @@
-function getExitEffect(type) {
-  return game.settings.get(MODULE_ID, type === "fumble" ? "fumbleExitEffect" : "criticalExitEffect");
-}
+import { effectManager } from "./effects/effect-manager.js";
+import { CriticalRubanUtils } from "./critical-ruban-utils.js";
 
-function getBannerManager() {
-  if (globalThis.__critBannerManager?.isAlive()) return globalThis.__critBannerManager;
-  globalThis.__critBannerManager = new BannerManager();
-  return globalThis.__critBannerManager;
-}
-
-class BannerManager {
-  constructor() {
-    this.parent = canvas?.overlay ?? canvas?.interface ?? canvas?.stage ?? canvas?.app?.stage ?? null;
-    this.ticker = canvas?.app?.ticker ?? PIXI?.Ticker?.shared ?? null;
-    this.root = new PIXI.Container();
-    this.root.sortableChildren = true;
-    this.root.eventMode = "none";
-    this.root.interactiveChildren = false;
-    this.root.zIndex = 999999;
-    this.banners = new Set();
-    this._boundTick = this._tick.bind(this);
-
-    if (!this.parent || !this.ticker) {
-      console.error(`${MODULE_ID} | Canvas overlay/ticker introuvable.`);
-      return;
-    }
-
-    this.parent.addChild(this.root);
-    this.ticker.add(this._boundTick);
-  }
-
-  isAlive() {
-    return !!this.root && !this.root.destroyed && !!this.parent && !!this.ticker;
-  }
-
-  addBanner(banner) {
-    this.banners.add(banner);
-    this.root.addChild(banner.root);
-    banner.attach(this);
-  }
-
-  removeBanner(banner) {
-    if (!this.banners.has(banner)) return;
-    this.banners.delete(banner);
-    banner.destroy();
-    releaseBannerSlot(banner.slotIndex);
-  }
-
-  _tick(ticker) {
-    const dtMS = typeof ticker?.deltaMS === "number" ? ticker.deltaMS : 1000 / 60;
-
-    for (const banner of [...this.banners]) {
-      try {
-        banner.update(dtMS);
-        if (banner.done) this.removeBanner(banner);
-      } catch (err) {
-        console.error(`${MODULE_ID} | Erreur animation ruban :`, err);
-        this.removeBanner(banner);
-      }
-    }
-  }
-}
-
-class CritBanner {
+export class CritBanner {
   constructor({ slotIndex, type, label, name, color, exitEffect }) {
     this.slotIndex = slotIndex;
     this.type = type;
-    this.kind = type === "fumble" ? "fumble" : "critical";
-    this.isFumble = this.kind === "fumble";
+        
     this.label = `${label} : ${name}`;
 
-    this.exitEffect = globalThis.CriticalRubanEffects.validateEffect(this.kind, exitEffect);
-    this.effect = globalThis.CriticalRubanEffects.getRubanEffect(this.exitEffect);
+    this.exitEffect = effectManager.validateForType(this.type, exitEffect);
+    this.effect = effectManager.get(this.exitEffect);
 
-    this.baseColorHex = cssToHex(normalizeHexColor(color) ?? "#8b0000");
-    this.mainColor = this.isFumble ? mixHex(this.baseColorHex, COLORS.red, 0.35) : this.baseColorHex;
-    this.darkColor = darkenHex(this.mainColor, 0.28);
-    this.darkerColor = darkenHex(this.mainColor, 0.45);
-    this.lightColor = lightenHex(this.mainColor, 0.20);
-    this.accentColor = this.isFumble ? COLORS.red : COLORS.gold;
+    this.baseColorHex = CriticalRubanUtils.cssToHex(CriticalRubanUtils.normalizeHexColor(color) ?? "#8b0000");
+    this.mainColor = this.isType("fumble") ? CriticalRubanUtils.mixHex(this.baseColorHex, CriticalRubanUtils.COLORS.red, 0.35) : this.baseColorHex;
+    this.darkColor = CriticalRubanUtils.darkenHex(this.mainColor, 0.28);
+    this.darkerColor = CriticalRubanUtils.darkenHex(this.mainColor, 0.45);
+    this.lightColor = CriticalRubanUtils.lightenHex(this.mainColor, 0.20);
+    this.accentColor = this.isType("fumble") ? CriticalRubanUtils.COLORS.red : CriticalRubanUtils.COLORS.gold;
 
-    const timing = globalThis.CriticalRubanEffects.getTiming(this.exitEffect);
-
-    this.enterDuration = this.isFumble ? 480 : 320;
-    this.holdDuration = timing.startDelay;
-    this.exitDuration = timing.totalDuration;
+    this.enterDuration = this.effect.getEnterDuration(type);
+    this.holdDuration = this.effect.getHoldDuration(type);
+    this.exitDuration = this.effect.getExitDuration(type);
 
     this.state = "enter";
     this.stateTime = 0;
@@ -102,7 +39,8 @@ class CritBanner {
     this.root.eventMode = "none";
     this.root.interactiveChildren = false;
     this.root.alpha = 0.01;
-        this.motion = new PIXI.Container();
+    
+    this.motion = new PIXI.Container();
     this.motion.sortableChildren = true;
     this.root.addChild(this.motion);
 
@@ -122,6 +60,10 @@ class CritBanner {
     this.effect.setup?.(this);
   }
 
+  isType(type) {
+    return this.type === type;
+  }
+
   attach(manager) {
     this.manager = manager;
   }
@@ -134,7 +76,7 @@ class CritBanner {
     const textHeight = Math.ceil(sample.height || 36);
     sample.destroy?.();
 
-    this.badgeSize = 58;
+    this.badgeSize = Math.max(84, textHeight + 34);
     this.height = Math.max(84, textHeight + 34);
     this.mainWidth = Math.min(Math.max(300, textWidth + this.badgeSize + 78), 1300);
     this.tailWidth = 54;
@@ -146,9 +88,9 @@ class CritBanner {
       fontFamily: "Signika, 'Palatino Linotype', serif",
       fontSize: 34,
       fontWeight: "700",
-      fill: COLORS.white,
+      fill: CriticalRubanUtils.COLORS.white,
       stroke: 0x1c1308,
-      strokeThickness: this.isFumble ? 5 : 4,
+      strokeThickness: this.isType("fumble") ? 5 : 4,
       lineJoin: "round",
       letterSpacing: 0.5,
       dropShadow: true,
@@ -234,8 +176,6 @@ class CritBanner {
       this.removeEffectLayer(key, true);
     }
   }
-
-  ensureCommonFxLayers() {}
 
   resetVisualState() {
     this.root.alpha = 1;
@@ -330,7 +270,7 @@ class CritBanner {
     const g = new PIXI.Graphics();
     const x = -this.mainWidth / 2 + 8;
     const y = -this.height / 2 + 8;
-    gRoundRect(g, x, y, this.mainWidth - 16, (this.height - 16) * 0.56, 12, this.lightColor, 0.33);
+    CriticalRubanUtils.gRoundRect(g, x, y, this.mainWidth - 16, (this.height - 16) * 0.56, 12, this.lightColor, 0.33);
     return g;
   }
 
@@ -338,7 +278,7 @@ class CritBanner {
     const g = new PIXI.Graphics();
     const x = -this.mainWidth / 2 + 12;
     const y = -this.height / 2 + 8;
-    gRoundRect(g, x, y, this.mainWidth - 24, 6, 4, COLORS.white, 0.18);
+    CriticalRubanUtils.gRoundRect(g, x, y, this.mainWidth - 24, 6, 4, CriticalRubanUtils.COLORS.white, 0.18);
     return g;
   }
 
@@ -346,7 +286,7 @@ class CritBanner {
     const g = new PIXI.Graphics();
     const x = -this.mainWidth / 2 + 10;
     const y = this.height / 2 - 12;
-    gRoundRect(g, x, y, this.mainWidth - 20, 6, 4, this.darkerColor, 0.7);
+    CriticalRubanUtils.gRoundRect(g, x, y, this.mainWidth - 20, 6, 4, this.darkerColor, 0.7);
     return g;
   }
 
@@ -423,7 +363,7 @@ class CritBanner {
     g.addChild(fold);
 
     const gloss = new PIXI.Graphics();
-    gloss.beginFill(COLORS.white, 0.08);
+    gloss.beginFill(CriticalRubanUtils.COLORS.white, 0.08);
     gloss.moveTo(sign * 8, -halfH + 10);
     gloss.bezierCurveTo(
       sign * 24, -halfH + 4,
@@ -444,8 +384,8 @@ class CritBanner {
   drawBadge() {
     const c = new PIXI.Container();
 
-    const iconPath = this.isFumble
-      ? `modules/${MODULE_ID}/assets/fumble.svg`
+    const iconPath = this.isType("fumble")
+      ? `modules/${CriticalRubanUtils.MODULE_ID}/assets/fumble.svg`
       : "icons/svg/d20.svg";
 
     const icon = PIXI.Sprite.from(iconPath);
@@ -481,7 +421,7 @@ class CritBanner {
   drawShine() {
     const g = new PIXI.Graphics();
     const shineWidth = 140;
-    gRoundRect(g, -shineWidth / 2, -this.height / 2 + 8, shineWidth, this.height - 16, 12, COLORS.white, 0.22);
+    CriticalRubanUtils.gRoundRect(g, -shineWidth / 2, -this.height / 2 + 8, shineWidth, this.height - 16, 12, CriticalRubanUtils.COLORS.white, 0.22);
     g.rotation = -0.24;
     return g;
   }
@@ -493,7 +433,7 @@ class CritBanner {
       x = 0,
       y = 0,
       radius = 2,
-      color = COLORS.white,
+      color = CriticalRubanUtils.COLORS.white,
       alpha = 1,
       vx = 0,
       vy = 0,
@@ -509,9 +449,9 @@ class CritBanner {
     const sprite = new PIXI.Graphics();
 
     if (shape === "star") {
-      gStar(sprite, 0, 0, 4, radius * 2.4, radius, color, alpha);
+      CriticalRubanUtils.gStar(sprite, 0, 0, 4, radius * 2.4, radius, color, alpha);
     } else {
-      gCircle(sprite, 0, 0, radius, color, alpha);
+      CriticalRubanUtils.gCircle(sprite, 0, 0, radius, color, alpha);
     }
 
     sprite.x = x;
@@ -538,15 +478,15 @@ class CritBanner {
     if (!renderer) return null;
 
     const bounds = new PIXI.Rectangle(
-      -this.totalWidth / 2 - 8,
-      -this.height / 2 - 8,
-      this.totalWidth + 16,
-      this.height + 16
+      -this.bodyGroup.width/2,
+      -this.bodyGroup.height / 2,
+      this.bodyGroup.width,
+      this.bodyGroup.height
     );
 
     const rt = PIXI.RenderTexture.create({
-      width: Math.ceil(bounds.width),
-      height: Math.ceil(bounds.height),
+      width: this.bodyGroup.width+2,
+      height: this.bodyGroup.height+2,
       resolution: renderer.resolution || window.devicePixelRatio || 1
     });
 
@@ -566,7 +506,7 @@ class CritBanner {
     return { texture: rt, bounds };
   }
 
-  createTexturedShard(points, texture, sourceBounds) {
+  createTexturedShard(points, texture, sourceBounds, borderColor = null) {
     const xs = [];
     const ys = [];
 
@@ -580,14 +520,22 @@ class CritBanner {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
-    const pad = 3;
+    const pad = 0;
 
-    const frameX = Math.floor(minX - sourceBounds.x - pad);
-    const frameY = Math.floor(minY - sourceBounds.y - pad);
-    const frameW = Math.ceil(maxX - minX + pad * 2);
-    const frameH = Math.ceil(maxY - minY + pad * 2);
+    const rawFrameX = Math.floor(minX - (-this.bodyGroup.width/2) - pad);
+    const rawFrameY = Math.floor(minY - (-this.bodyGroup.height/2) - pad);
+    const rawFrameW = Math.ceil(maxX - minX + pad * 2);
+    const rawFrameH = Math.ceil(maxY - minY + pad * 2);
 
     const base = texture.baseTexture;
+    const frameX = Math.max(0, Math.min(rawFrameX, this.bodyGroup.width));
+    const frameY = Math.max(0, Math.min(rawFrameY, this.bodyGroup.height));
+    const frameW = Math.max(1, Math.min(rawFrameW - (frameX - rawFrameX), this.bodyGroup.width - frameX));
+    const frameH = Math.max(1, Math.min(rawFrameH - (frameY - rawFrameY), this.bodyGroup.height - frameY));
+
+    const shiftX = frameX - rawFrameX;
+    const shiftY = frameY - rawFrameY;
+
     const frame = new PIXI.Rectangle(frameX, frameY, frameW, frameH);
     const croppedTexture = new PIXI.Texture(base, frame);
 
@@ -595,20 +543,17 @@ class CritBanner {
     shard.x = minX - pad;
     shard.y = minY - pad;
 
-    const sprite = new PIXI.Sprite(croppedTexture);
-    sprite.x = 0;
-        sprite.y = 0;
-
     const localPts = [];
     for (let i = 0; i < points.length; i += 2) {
-      localPts.push(points[i] - shard.x, points[i + 1] - shard.y);
+      localPts.push(points[i] - shard.x - shiftX, points[i + 1] - shard.y - shiftY);
     }
 
-    const mask = new PIXI.Graphics();
-    gPoly(mask, localPts, COLORS.white, 1);
+    const sprite = new PIXI.Sprite(croppedTexture);
+    sprite.x = 0;
+    sprite.y = 0;
 
-    const edge = new PIXI.Graphics();
-    gPoly(edge, localPts, null, 1, 1.25, COLORS.iceBright, 0.65);
+    const mask = new PIXI.Graphics();
+    CriticalRubanUtils.gPoly(mask, localPts, CriticalRubanUtils.COLORS.white, 1);
 
     const gloss = new PIXI.Graphics();
     const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -618,20 +563,20 @@ class CritBanner {
     for (let i = 0; i < localPts.length; i += 2) {
       const px = localPts[i];
       const py = localPts[i + 1];
-      const localCx = cx - shard.x;
-      const localCy = cy - shard.y;
+      const localCx = cx - shard.x - shiftX;
+      const localCy = cy - shard.y - shiftY;
 
       glossPts.push(
-        lerp(localCx, px, 0.58),
-        lerp(localCy, py, 0.58)
+        CriticalRubanUtils.lerp(localCx, px, 0.58),
+        CriticalRubanUtils.lerp(localCy, py, 0.58)
       );
     }
 
-    gPoly(gloss, glossPts, COLORS.white, 0.10);
+    CriticalRubanUtils.gPoly(gloss, glossPts, CriticalRubanUtils.COLORS.white, 0.10);
 
+    
     shard.addChild(sprite);
     shard.addChild(mask);
-    shard.addChild(edge);
     shard.addChild(gloss);
     sprite.mask = mask;
 
@@ -644,19 +589,16 @@ class CritBanner {
       height: window.innerHeight
     };
 
-    const slot = BANNER_SLOTS[this.slotIndex] ?? BANNER_SLOTS[0];
-    const userScale = (game.settings.get(MODULE_ID, "bannerScale") ?? 100) / 100;
-
-    const useCustom = game.settings.get(MODULE_ID, "useCustomPos");
-    const customX = game.settings.get(MODULE_ID, "bannerPosX");
-    const customY = game.settings.get(MODULE_ID, "bannerPosY");
+    const slot = CriticalRubanUtils.BANNER_SLOTS[this.slotIndex] ?? CriticalRubanUtils.BANNER_SLOTS[0];
+    const userScale = (game.settings.get(CriticalRubanUtils.MODULE_ID, "bannerScale") ?? 100) / 100;
+    const {isCustomPos = false, bannerPosX = 0, bannerPosY = 0} = game.settings.get(CriticalRubanUtils.MODULE_ID, "customPosition") || {};
 
     let anchorX = 0.5;
     let anchorY = 0.5;
 
-    if (useCustom && customX !== null && customY !== null) {
-      anchorX = customX;
-      anchorY = customY;
+    if (isCustomPos && bannerPosX !== null && bannerPosY !== null) {
+      anchorX = bannerPosX;
+      anchorY = bannerPosY;
     }
 
     const offsetX = (slot.x - 0.5) * screen.width * userScale;
@@ -680,7 +622,7 @@ class CritBanner {
 
       const glow = 0.48 + Math.sin((this.elapsed / 1000) * 4.8 + this.floatSeed) * 0.08;
       const shinePulse = ((this.elapsed / 1000) + this.shineSeed) % 1.85;
-      const shineT = clamp01((shinePulse - 0.15) / 0.55);
+      const shineT = CriticalRubanUtils.clamp01((shinePulse - 0.15) / 0.55);
 
       this.root.alpha = 1;
       this.motion.scale.set(this.baseScale);
@@ -691,7 +633,7 @@ class CritBanner {
       this.shine.alpha = shinePulse > 0.15 && shinePulse < 0.70
         ? Math.sin(shineT * Math.PI) * 0.30
         : 0;
-      this.shine.x = lerp(-this.mainWidth * 0.7, this.mainWidth * 0.7, easeInOutQuad(shineT));
+      this.shine.x = CriticalRubanUtils.lerp(-this.mainWidth * 0.7, this.mainWidth * 0.7, CriticalRubanUtils.easeInOutQuad(shineT));
 
       this.effect.onHold?.(this, 0, dtMS);
       this.updateParticles(dtMS);
@@ -699,11 +641,11 @@ class CritBanner {
     }
 
     this.elapsed += dtMS;
-        this.stateTime += dtMS;
+    this.stateTime += dtMS;
     this.lastDtMS = dtMS;
 
     if (this.state === "enter") {
-      this.updateEnter();
+      this.updateEnter(dtMS);
       if (this.stateTime >= this.enterDuration) this.changeState("hold");
     } else if (this.state === "hold") {
       this.updateHold(dtMS);
@@ -726,64 +668,19 @@ class CritBanner {
     this.effect.onPrepareExit?.(this);
   }
 
-  updateEnter() {
-    const t = clamp01(this.stateTime / this.enterDuration);
-    const e = this.isFumble ? easeOutBackSoft(t) : easeOutCubic(t);
-    const offsetX = lerp(this.isFumble ? -145 : -120, 0, e);
-    const offsetY = lerp(this.isFumble ? 6 : -8, 0, e);
-    const scale = lerp(this.isFumble ? 0.88 : 0.9, 1, e);
-    const alpha = lerp(0, 1, easeOutCubic(t));
-    const rot = this.baseRotation + lerp(this.isFumble ? -0.025 : -0.015, 0, e);
-    const shake = this.isFumble ? Math.sin(t * Math.PI * 7) * (1 - t) * 8 : 0;
-
-    this.root.position.set(this.baseX + offsetX + shake, this.baseY + offsetY);
-    this.motion.scale.set(this.baseScale * scale);
-    this.motion.rotation = rot;
-    this.root.alpha = alpha;
-    this.updateCommonFX(t, true);
+  updateEnter(dtMS) {
+    const t = CriticalRubanUtils.clamp01(this.stateTime / this.enterDuration);
+    this.effect.onEnter?.(this, t, dtMS);
   }
 
   updateHold(dtMS) {
-    const t = clamp01(this.stateTime / this.holdDuration);
-    const bob = Math.sin((this.elapsed / 1000) * 2.6 + this.floatSeed) * 1.2;
-    const glow = 0.48 + Math.sin((this.elapsed / 1000) * 4.8 + this.floatSeed) * 0.08;
-    const shinePulse = ((this.elapsed / 1000) + this.shineSeed) % 1.85;
-    const shineT = clamp01((shinePulse - 0.15) / 0.55);
-
-    this.root.position.set(this.baseX, this.baseY + bob);
-    this.root.alpha = 1;
-    this.motion.scale.set(this.baseScale);
-    this.motion.rotation = this.baseRotation + (this.isFumble ? Math.sin((this.elapsed / 1000) * 6.2) * 0.004 : 0);
-
-    this.innerGlow.alpha = glow;
-    this.shine.alpha = shinePulse > 0.15 && shinePulse < 0.70 ? Math.sin(shineT * Math.PI) * 0.30 : 0;
-    this.shine.x = lerp(-this.mainWidth * 0.7, this.mainWidth * 0.7, easeInOutQuad(shineT));
-
-    this.motion.tint = 0xffffff;
+    const t = CriticalRubanUtils.clamp01(this.stateTime / this.holdDuration);
     this.effect.onHold?.(this, t, dtMS);
   }
 
   updateExit(dtMS) {
-    const t = clamp01(this.stateTime / this.exitDuration);
+    const t = CriticalRubanUtils.clamp01(this.stateTime / this.exitDuration);
     this.effect.onExit?.(this, t, dtMS);
-  }
-
-  updateCurrentExitBase(t) {
-    const e = easeInCubic(t);
-    this.root.alpha = 1 - e;
-    this.root.position.set(this.baseX + lerp(0, 40, e), this.baseY + lerp(0, -10, e));
-    this.motion.scale.set(this.baseScale * lerp(1, 1.04, e));
-    this.motion.rotation = this.baseRotation + lerp(0, this.isFumble ? -0.03 : 0.02, e);
-    this.innerGlow.alpha = lerp(0.5, 0.15, e);
-    this.shine.alpha = lerp(this.shine.alpha, 0, 0.3);
-  }
-
-  updateCommonFX(t, entering = false) {
-    this.innerGlow.alpha = lerp(0.2, 0.55, t);
-    if (entering) {
-      this.shine.alpha = Math.sin(t * Math.PI) * 0.18;
-      this.shine.x = lerp(-50, 14, t);
-    }
   }
 
   updateParticles(dtMS) {
@@ -795,14 +692,14 @@ class CritBanner {
       }
 
       p.age += dtMS;
-      const t = clamp01(p.age / p.life);
+      const t = CriticalRubanUtils.clamp01(p.age / p.life);
 
       p.sprite.x += p.vx * (dtMS / 1000);
       p.sprite.y += p.vy * (dtMS / 1000);
       p.sprite.rotation += p.vr ?? 0;
-            const scale = lerp(p.scaleFrom ?? 1, p.scaleTo ?? 0.3, t);
+            const scale = CriticalRubanUtils.lerp(p.scaleFrom ?? 1, p.scaleTo ?? 0.3, t);
       p.sprite.scale.set(scale);
-      p.sprite.alpha = (p.startAlpha ?? 1) * (1 - easeInQuad(t));
+      p.sprite.alpha = (p.startAlpha ?? 1) * (1 - CriticalRubanUtils.easeInQuad(t));
 
       if (p.age >= p.life) {
         try {
@@ -814,7 +711,7 @@ class CritBanner {
           p.sprite.visible = false;
           p.sprite.renderable = false;
         } catch (err) {
-          console.warn(`${MODULE_ID} | Erreur nettoyage particule expirée :`, err);
+          console.warn(`${CriticalRubanUtils.MODULE_ID} | Erreur nettoyage particule expirée :`, err);
         }
 
         this.particles.splice(i, 1);
@@ -829,7 +726,7 @@ class CritBanner {
     try {
       this.effect.onDestroy?.(this);
     } catch (err) {
-      console.warn(`${MODULE_ID} | Erreur onDestroy effet :`, err);
+      console.warn(`${CriticalRubanUtils.MODULE_ID} | Erreur onDestroy effet :`, err);
     }
 
     for (const p of this.particles) {
@@ -841,7 +738,7 @@ class CritBanner {
         p.sprite.visible = false;
         p.sprite.renderable = false;
       } catch (err) {
-        console.warn(`${MODULE_ID} | Erreur nettoyage particule :`, err);
+        console.warn(`${CriticalRubanUtils.MODULE_ID} | Erreur nettoyage particule :`, err);
       }
     }
     this.particles = [];
@@ -849,244 +746,14 @@ class CritBanner {
     try {
       this.clearEffectLayers();
     } catch (err) {
-      console.warn(`${MODULE_ID} | Erreur clearEffectLayers :`, err);
+      console.warn(`${CriticalRubanUtils.MODULE_ID} | Erreur clearEffectLayers :`, err);
     }
 
     try {
       this.root.parent?.removeChild(this.root);
       this.root.destroy({ children: true });
     } catch (err) {
-      console.warn(`${MODULE_ID} | Erreur destruction root :`, err);
+      console.warn(`${CriticalRubanUtils.MODULE_ID} | Erreur destruction root :`, err);
     }
   }
 }
-
-function hideFoundryWindowsForBannerPlacement() {
-  const hidden = [];
-
-  for (const app of Object.values(ui.windows ?? {})) {
-    const element = app?.element?.[0];
-    if (!element) continue;
-
-    const computed = window.getComputedStyle(element);
-    if (computed.display === "none") continue;
-
-    hidden.push(app.appId);
-    element.dataset.critRubanPrevDisplay = element.style.display ?? "";
-    element.style.display = "none";
-  }
-
-  return hidden;
-}
-
-function restoreFoundryWindowsForBannerPlacement(hiddenAppIds = []) {
-  for (const appId of hiddenAppIds) {
-    const app = ui.windows?.[appId];
-    const element = app?.element?.[0];
-    if (!element) continue;
-
-    const prev = element.dataset.critRubanPrevDisplay;
-    element.style.display = prev ?? "";
-    delete element.dataset.critRubanPrevDisplay;
-  }
-}
-
-function destroyBannerPositionPreview() {
-  const preview = globalThis.__critBannerPositionPreview;
-  if (!preview) return;
-
-  try {
-    preview.cleanup?.();
-  } catch (err) {
-    console.warn(`${MODULE_ID} | Erreur cleanup preview :`, err);
-  }
-
-  try {
-    if (preview.manager && Array.isArray(preview.banners)) {
-      for (const banner of preview.banners) {
-        preview.manager.removeBanner(banner);
-      }
-    }
-  } catch (err) {
-    console.warn(`${MODULE_ID} | Erreur suppression ruban preview :`, err);
-  }
-
-  try {
-    if (preview.overlay?.parentNode) {
-      preview.overlay.parentNode.removeChild(preview.overlay);
-    }
-      } catch (err) {
-    console.warn(`${MODULE_ID} | Erreur suppression overlay preview :`, err);
-  }
-
-  try {
-    restoreFoundryWindowsForBannerPlacement(preview.hiddenWindows ?? []);
-  } catch (err) {
-    console.warn(`${MODULE_ID} | Erreur restauration fenêtres :`, err);
-  }
-
-  globalThis.__critBannerPositionPreview = null;
-}
-
-async function openPixiBannerPositionPicker() {
-  destroyBannerPositionPreview();
-
-  const manager = getBannerManager();
-  if (!manager) {
-    ui.notifications.error(
-      game.i18n.localize("critical-ruban.positionPicker.managerError")
-    );
-    return;
-  }
-
-  const previews = BANNER_SLOTS.map((slot, index) => {
-  const preview = new CritBanner({
-      slotIndex: index,
-      type: index === 0 ? "critical" : "fumble",
-      label: index === 0
-        ? game.i18n.localize("critical-ruban.ruban.label.criticalSuccess")
-        : game.i18n.localize("critical-ruban.ruban.label.criticalFailure"),
-      name: `${game.i18n.localize("critical-ruban.positionPicker.previewName")} ${index + 1}`,
-      color: game.user?.color?.css ?? game.user?.color?.toString?.() ?? game.user?.color ?? "#8b0000",
-      exitEffect: DEFAULT_EFFECT_ID
-    });
-
-    preview.isPreview = true;
-    preview.state = "hold";
-    preview.stateTime = 0;
-    preview.elapsed = 0;
-    preview.enterDuration = 0;
-    preview.holdDuration = Number.MAX_SAFE_INTEGER;
-    preview.exitDuration = 0;
-    preview.done = false;
-
-    manager.addBanner(preview);
-    return preview;
-  });
-
-  const screen = canvas?.app?.renderer?.screen ?? {
-    width: window.innerWidth,
-    height: window.innerHeight
-  };
-
-  const savedX = game.settings.get(MODULE_ID, "bannerPosX");
-  const savedY = game.settings.get(MODULE_ID, "bannerPosY");
-
-  const state = {
-    x: savedX ?? 0.5,
-    y: savedY ?? 0.5
-  };
-
-  for (const preview of previews) {
-    preview.root.alpha = 1;
-    preview.motion.rotation = preview.baseRotation;
-    preview.motion.scale.set(preview.baseScale);
-  }
-
-  const hiddenWindows = hideFoundryWindowsForBannerPlacement();
-
-  const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.zIndex = "999999";
-  overlay.style.cursor = "crosshair";
-  overlay.style.background = "transparent";
-  overlay.style.pointerEvents = "auto";
-
-  const help = document.createElement("div");
-  help.textContent = game.i18n.localize("critical-ruban.positionPicker.help");
-  help.style.position = "fixed";
-  help.style.left = "50%";
-  help.style.top = "20px";
-  help.style.transform = "translateX(-50%)";
-  help.style.padding = "10px 14px";
-  help.style.borderRadius = "10px";
-  help.style.background = "rgba(0, 0, 0, 0.78)";
-  help.style.color = "white";
-  help.style.fontSize = "14px";
-  help.style.lineHeight = "1.2";
-  help.style.pointerEvents = "none";
-  help.style.boxShadow = "0 4px 14px rgba(0,0,0,0.35)";
-
-  overlay.appendChild(help);
-  document.body.appendChild(overlay);
-
-  function clampPreview(v) {
-    return Math.max(0, Math.min(1, v));
-  }
-
-  function updatePreviewFromClient(clientX, clientY) {
-    state.x = clampPreview(clientX / window.innerWidth);
-    state.y = clampPreview(clientY / window.innerHeight);
-
-    const anchorX = screen.width * state.x;
-    const anchorY = screen.height * state.y;
-    const userScale = (game.settings.get(MODULE_ID, "bannerScale") ?? 100) / 100;
-
-    for (let i = 0; i < previews.length; i++) {
-      const preview = previews[i];
-      const slot = BANNER_SLOTS[i] ?? BANNER_SLOTS[0];
-
-      const offsetX = (slot.x - 0.5) * screen.width * userScale;
-      const offsetY = (slot.y - 0.5) * screen.height * userScale;
-
-      preview.baseX = anchorX + offsetX;
-      preview.baseY = anchorY + offsetY;
-      preview.root.position.set(preview.baseX, preview.baseY);
-    }
-  }
-    const onPointerMove = (ev) => {
-    updatePreviewFromClient(ev.clientX, ev.clientY);
-  };
-
-  const onClick = async (ev) => {
-    updatePreviewFromClient(ev.clientX, ev.clientY);
-
-    await game.settings.set(MODULE_ID, "bannerPosX", state.x);
-    await game.settings.set(MODULE_ID, "bannerPosY", state.y);
-    await game.settings.set(MODULE_ID, "useCustomPos", true);
-
-    destroyBannerPositionPreview();
-
-    ui.notifications.info(
-      game.i18n.localize("critical-ruban.positionPicker.saveNotification")
-    );
-
-    setTimeout(() => game.settings.sheet.render(true), 0);
-  };
-
-  const onKeyDown = async (ev) => {
-    if (ev.key !== "Escape") return;
-
-    destroyBannerPositionPreview();
-
-    ui.notifications.info(
-      game.i18n.localize("critical-ruban.positionPicker.cancelNotification")
-    );
-
-    setTimeout(() => game.settings.sheet.render(true), 0);
-  };
-
-  overlay.addEventListener("pointermove", onPointerMove);
-  overlay.addEventListener("click", onClick);
-  window.addEventListener("keydown", onKeyDown, true);
-
-  globalThis.__critBannerPositionPreview = {
-    manager,
-    banners: previews,
-    overlay,
-    hiddenWindows,
-    cleanup: () => {
-      overlay.removeEventListener("pointermove", onPointerMove);
-      overlay.removeEventListener("click", onClick);
-      window.removeEventListener("keydown", onKeyDown, true);
-    }
-  };
-
-  ui.notifications.info(
-    game.i18n.localize("critical-ruban.positionPicker.help")
-  );
-}
-
-globalThis.openPixiBannerPositionPicker = openPixiBannerPositionPicker;
-globalThis.destroyBannerPositionPreview = destroyBannerPositionPreview;
