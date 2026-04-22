@@ -61,8 +61,7 @@ class CriticalRuban {
 
     Hooks.callAll("critical-ruban:registerSystems", this.criticalRubanApi);
 
-    Hooks.on("renderChatMessageHTML", this.onRenderChatMessageHTML.bind(this));
-
+    Hooks.on("createChatMessage", this.onRenderChatMessageHTML.bind(this));
     if (game.modules.get("dice-so-nice")?.active) {
       Hooks.on("diceSoNiceRollComplete", this.onDiceSoNiceRollComplete.bind(this));
     }
